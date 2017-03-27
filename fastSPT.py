@@ -1,8 +1,8 @@
 # A packaged version of the fastSPT code by Anders Sejr Hansen, Feb. 2016
 # Python rewriting by MW, March 2017
 #
-# In this script we will fit fastSPT data to the simple BOUND-UNBOUND
-# 2-state model and determine the best-fit parameters
+# In this script we will compute jump length distributions, fit fastSPT data
+# to the simple BOUND-UNBOUND 2-state model and determine the best-fit parameters
 # 
 # History: For the history of the script see the related CHANGELOG file.
 
@@ -30,7 +30,7 @@ def pdist(m):
 def compute_jump_length_distribution(trackedPar,
                                      CDF=False, useAllTraj=False, TimePoints=8,
                                      GapsAllowed=1, JumpsToConsider=4,
-                                     MaxJump=1.25, BinWidth=0.010):
+                                     TimeGap=4.477, MaxJump=1.25, BinWidth=0.010):
     """Function that takes a series of translocations and computes an histogram of
     jump lengths. Returns both
 
@@ -41,6 +41,7 @@ def compute_jump_length_distribution(trackedPar,
     - TimePoints (int): how many jump lengths to use for the fitting: 3 timepoints, yields 2 jumps
     - GapsAllowed (int): number of missing frames that are allowed in a single trajectory
     - JumpsToConsider (int): if `UseAllTraj` is False, then use no more than 3 jumps. 
+    - TimeGap (float): time between frames in milliseconds;
     - MaxJump (float): for PDF fitting and plotting
     - BinWidth (float): for PDF fitting and plotting
 
@@ -83,30 +84,30 @@ def compute_jump_length_distribution(trackedPar,
         for i in range(len(trackedPar)): #1:length(trackedPar)
             CurrTrajLength = trackedPar[i][0].shape[0] #size(trackedPar(i).xy,1);
 
-        if CurrTrajLength >= 3: # save lengths
-            Min3Traj += 1
+            if CurrTrajLength >= 3: # save lengths
+                Min3Traj += 1
 
-        #Now loop through the trajectory. Keep in mind that there are 
-        #missing timepoints in the trajectory, so some gaps may be for 
-        #multiple timepoints.
+            #Now loop through the trajectory. Keep in mind that there are 
+            #missing timepoints in the trajectory, so some gaps may be for 
+            #multiple timepoints.
 
-        #Figure out what the max jump to consider is:
-        HowManyFrames = min(TimePoints-1, CurrTrajLength)
-        if CurrTrajLength > 1:
-            CellJumps = CellJumps+CurrTrajLength-1 # for counting all the jumps
-            for n in range(1, HowManyFrames+1): #1:HowManyFrames
-                for k in range(CurrTrajLength-(n+1)): #=1:CurrTrajLength-n
-                    # Find the current XY coordinate and frames between
-                    # timepoints
-                    CurrXY_points = np.vstack((trackedPar[i][0][k,:],
-                                               trackedPar[i][0][k+n,:]))
-                    # vertcat(trackedPar(i).xy[k,:], trackedPar(i).xy[k+n,:])
-                    CurrFrameJump = trackedPar[i][2][0][k+n] - \
-                                    trackedPar[i][2][0][k]
-                    #trackedPar(i).Frame(k+n) - trackedPar(i).Frame(k);
+            #Figure out what the max jump to consider is:
+            HowManyFrames = min(TimePoints-1, CurrTrajLength)
+            if CurrTrajLength > 1:
+                CellJumps = CellJumps+CurrTrajLength-1 # for counting all the jumps
+                for n in range(1, HowManyFrames+1): #1:HowManyFrames
+                    for k in range(CurrTrajLength-(n+1)): #=1:CurrTrajLength-n
+                        # Find the current XY coordinate and frames between
+                        # timepoints
+                        CurrXY_points = np.vstack((trackedPar[i][0][k,:],
+                                                   trackedPar[i][0][k+n,:]))
+                        # vertcat(trackedPar(i).xy[k,:], trackedPar(i).xy[k+n,:])
+                        CurrFrameJump = trackedPar[i][2][0][k+n] - \
+                                        trackedPar[i][2][0][k]
+                        #trackedPar(i).Frame(k+n) - trackedPar(i).Frame(k);
 
-                    # Calculate the distance between the pair of points
-                    TransLengths[CurrFrameJump-1]["Step"].append(pdist(CurrXY_points))
+                        # Calculate the distance between the pair of points
+                        TransLengths[CurrFrameJump-1]["Step"].append(pdist(CurrXY_points))
 
     elif not useAllTraj: ## Use only the first JumpsToConsider timepoints
         for i in range(len(trackedPar)): #1:length(trackedPar)
@@ -159,6 +160,7 @@ def compute_jump_length_distribution(trackedPar,
 
     
     if PDF:
-        return [JumpProb, {'time': toc-tic}]
+        return [HistVecJumps, JumpProb, {'time': toc-tic}]
     elif CDF:
-        return [JumpProbCDF, JumpProb, {'time': toc-tic}]
+        return [HistVecJumpsCDF,JumpProbCDF, HistVecJumps, JumpProb,
+                {'time': toc-tic}]
