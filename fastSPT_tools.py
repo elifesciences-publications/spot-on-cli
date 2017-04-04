@@ -44,3 +44,7 @@ def load_dataset(path, datasetID, cellID):
         AllData.append(np.asarray(mat['trackedPar'][0]))
     return np.hstack(AllData) ## Concatenate them before returning
 
+def load_dataset_from_path(path):
+    """Returns a dataset object from a Matlab file"""
+    mat = scipy.io.loadmat(path)
+    return np.asarray(mat['trackedPar'][0])
