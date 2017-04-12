@@ -350,11 +350,11 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
 
         ## Normalize the PDF
         for i in range(Binned_y_CDF.shape[0]):
-            Binned_y_PDF[i,:] = y[i,:]/y[i,:].sum()
+            Binned_y_PDF[i,:] = y[i,:-1]/y[i,:-1].sum()
     
         ## calculate the CDF
         for i in range(Binned_y_CDF.shape[0]): #1:size(Binned_y_CDF,1):
-            for j in range(2, Binned_y_CDF.shape[1]): #=2:size(Binned_y_CDF,2):
+            for j in range(1, Binned_y_CDF.shape[1]): #=2:size(Binned_y_CDF,2):
                 Binned_y_CDF[i,j] = Binned_y_PDF[i,:j].sum()
 
         Binned_y = Binned_y_CDF ##Output the final variable
