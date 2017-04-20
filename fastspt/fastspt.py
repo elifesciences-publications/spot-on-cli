@@ -161,7 +161,6 @@ def compute_jump_length_distribution(trackedPar,
         for i in range(JumpProbCDF.shape[0]): #1:size(JumpProbCDF,1)
             for j in range(2,JumpProbCDF.shape[1]+1): #=2:size(JumpProbCDF,2)
                 JumpProbCDF[i,j-1] = sum(JumpProbFine[i,:j])
-        print "toot"
 
     toc = time.time()
 
