@@ -415,14 +415,17 @@ def C_AbsorBoundAUTO(z, CurrTime, D, halfZ):
     Original Matlab code in SS_2State_model_Z_corr_v4.m
     """
 
-    WhenToStop = 1e-6 # 1e-10
+    WhenToStop = 1e-10
     f = np.inf
     n = 0 # iterator
     h = 1
     
     while np.abs(f) > WhenToStop:
         #print ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5, ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5 ## DBG
-        f = ((-1)^n) * ( erfc( ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5) +  erfc( ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5) )
+        f = ((-1)**n) * ( erfc( ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5) +  erfc( ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5) )
         h -= f
         n += 1
     return h
+
+
+#(-1)^n * ( erfc( ((2*n+1)*halfZ-z)/sqrt(4*D*CurrTime)) +  erfc( ((2*n+1)*halfZ+z)/sqrt(4*D*CurrTime))  );
