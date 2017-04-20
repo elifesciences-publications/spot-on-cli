@@ -140,20 +140,24 @@ def compute_jump_length_distribution(trackedPar,
                         TransLengths[CurrFrameJump-1]["Step"].append(pdist(CurrXY_points))
 
     ## Calculate the PDF histograms (required for CDF)
-    HistVecJumps = np.arange(0, MaxJump, BinWidth)  # jump lengths in micrometers
-    JumpProb = np.zeros((TimePoints-1, len(HistVecJumps)-1)) ## second -1 added when converting to Python due to inconsistencies between the histc and histogram function
+    HistVecJumps = np.arange(0, MaxJump+BinWidth, BinWidth)  # jump lengths in micrometers
+    JumpProb = np.zeros((TimePoints-1, len(HistVecJumps))) ## second -1 added when converting to Python due to inconsistencies between the histc and histogram function
     # TODO MW: investigate those differences
     for i in range(JumpProb.shape[0]):
-        JumpProb[i,:] = np.float_(np.histogram(TransLengths[i]["Step"], bins=HistVecJumps)[0])/len(TransLengths[i]["Step"]) ## /!\ TODO MW: check that Matlab histc and np.histogram are equivalent
+        JumpProb[i,:] = np.float_(
+            np.histogram(TransLengths[i]["Step"],
+                         bins=np.hstack((HistVecJumps, MaxJump)))[0])/len(TransLengths[i]["Step"])
         
     if CDF: ## CALCULATE THE CDF HISTOGRAMS:
-        HistVecJumpsCDF = np.arange(0, MaxJump, 0.001)  # jump lengths in micrometers
-        JumpProbFine = np.zeros((TimePoints-1, len(HistVecJumpsCDF)-1))
-        
+        BinWidthCDF = 0.001
+        HistVecJumpsCDF = np.arange(0, MaxJump+BinWidthCDF, BinWidthCDF)  # jump lengths in micrometers
+        JumpProbFine = np.zeros((TimePoints-1, len(HistVecJumpsCDF)))
         for i in range(JumpProb.shape[0]):
-            JumpProbFine[i,:] = np.float_(np.histogram(TransLengths[i]["Step"], bins=HistVecJumpsCDF)[0])/len(TransLengths[i]["Step"]) ## /!\ TODO MW: check that Matlab histc and np.histogram are equivalent
+            JumpProbFine[i,:] = np.float_(
+                np.histogram(TransLengths[i]["Step"],
+                             bins=np.hstack((HistVecJumpsCDF, MaxJump)))[0])/len(TransLengths[i]["Step"])
         
-        JumpProbCDF = np.zeros((TimePoints-1, len(HistVecJumpsCDF)-1)) ## second -1 added when converting to Python due to inconsistencies between the histc and histogram function
+        JumpProbCDF = np.zeros((TimePoints-1, len(HistVecJumpsCDF))) ## second -1 added when converting to Python due to inconsistencies between the histc and histogram function
         for i in range(JumpProbCDF.shape[0]): #1:size(JumpProbCDF,1)
             for j in range(2,JumpProbCDF.shape[1]): #=2:size(JumpProbCDF,2)
                 JumpProbCDF[i,j] = sum(JumpProbFine[i,:j])
