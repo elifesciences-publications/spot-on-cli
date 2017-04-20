@@ -332,7 +332,7 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
 	## Now bin the output y so that it matches the JumpProb variable: 
 	for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
 	    for j in range(JumpProb.shape[1]): #=1:size(JumpProb,2)
-		if j == JumpProb.shape[1]:
+		if j == (JumpProb.shape[1]-1):
 		    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
 		else:
 		    #[~, minIndex] = min(abs(r-HistVecJumps(j)));
