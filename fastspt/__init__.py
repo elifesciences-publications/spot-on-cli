@@ -1,4 +1,6 @@
 from fastspt import *
+from version import __version__
+
 import fastSPT_tools
 try:
 	import fastSPT_plot
