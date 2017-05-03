@@ -146,7 +146,7 @@ def compute_jump_length_distribution(trackedPar,
     for i in range(JumpProb.shape[0]):
         JumpProb[i,:] = np.float_(
             np.histogram(TransLengths[i]["Step"],
-                         bins=np.hstack((HistVecJumps, MaxJump)))[0])/len(TransLengths[i]["Step"])
+                         bins=np.hstack((HistVecJumps, HistVecJumps[-1])) )[0])/len(TransLengths[i]["Step"])
         
     if CDF: ## CALCULATE THE CDF HISTOGRAMS:
         BinWidthCDF = 0.001
@@ -155,7 +155,7 @@ def compute_jump_length_distribution(trackedPar,
         for i in range(JumpProb.shape[0]):
             JumpProbFine[i,:] = np.float_(
                 np.histogram(TransLengths[i]["Step"],
-                             bins=np.hstack((HistVecJumpsCDF, MaxJump)))[0])/len(TransLengths[i]["Step"])
+                             bins=np.hstack((HistVecJumpsCDF, HistVecJumpsCDF[-1]) ))[0])/len(TransLengths[i]["Step"])
         
         JumpProbCDF = np.zeros((TimePoints-1, len(HistVecJumpsCDF))) ## second -1 added when converting to Python due to inconsistencies between the histc and histogram function
         for i in range(JumpProbCDF.shape[0]): #1:size(JumpProbCDF,1)
@@ -250,7 +250,8 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
 
         out = jumplengthmodel.fit(y.flatten(), x=x, params=pars) ## FIT
         ssq2 = (out.residual**2).sum()/out.residual.shape[0]
-
+        out.ssq2 = ssq2
+        
         ## See if the current fit is an improvement:
         if ssq2 < best_ssq2:
             best_vals = out.params
@@ -292,7 +293,8 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     # ==== Precompute stuff
     # Calculate the axial Z-correction
     # First calculate the corrected DeltaZ:
-    DeltaZ_use = dZ + 0.15716  * D_FREE**.5 + 0.20811 # See CHANGELOG_fit
+    ##DeltaZ_use = dZ + 0.15716  * D_FREE**.5 + 0.20811 # See CHANGELOG_fit
+    DeltaZ_use = dZ + 0.24472 * D_FREE**.5 + 0.19789
     HalfDeltaZ_use = DeltaZ_use/2    
 
     for iterator in range(JumpProb.shape[0]): #=1:size(JumpProb,1):
@@ -354,7 +356,7 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
 
         ## Normalize the PDF
         for i in range(Binned_y_CDF.shape[0]):
-            Binned_y_PDF[i,:] = y[i,:-1]/y[i,:-1].sum()
+            Binned_y_PDF[i,:] = y[i,:]/y[i,:].sum()
     
         ## calculate the CDF
         for i in range(Binned_y_CDF.shape[0]): #1:size(Binned_y_CDF,1):
