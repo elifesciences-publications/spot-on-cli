@@ -175,7 +175,7 @@ def compute_jump_length_distribution(trackedPar,
 def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
                                  D_Free, D_Bound, Frac_Bound,
-                                 LocError, iterations, dT, dZ, ModelFit,
+                                 LocError, iterations, dT, dZ, ModelFit, a, b,
                                  verbose=True):
     """Fits a kinetic model to an empirical jump length distribution.
 
@@ -212,7 +212,9 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
               "JumpProb": JumpProb,
               "JumpProbCDF": JumpProbCDF,
               "LB": LB,
-              "UB": UB}
+              "UB": UB,
+              "a": a,
+              "b": b}
 
     ## ==== Get ready for the fitting
     def wrapped_jump_length(x, D_free, D_bound, F_bound):
@@ -226,7 +228,9 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['dT'],
                 params['dZ'],
                 params['LocError'],
-                params['PDF_or_CDF'], verbose=False)
+                params['PDF_or_CDF'],
+                params['a'],
+                params['b'], verbose=False)
         elif params['PDF_or_CDF'] == 2: # CDF fit
             dis = simulate_jump_length_distribution(
                 (D_free, D_bound, F_bound), 
@@ -236,7 +240,9 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['dT'],
                 params['dZ'],
                 params['LocError'],
-                params['PDF_or_CDF'], verbose=False)
+                params['PDF_or_CDF'],
+                params['a'],
+                params['b'], verbose=False)
         return dis.flatten()
     
     jumplengthmodel = lmfit.Model(wrapped_jump_length) ## Instantiate model
@@ -250,7 +256,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
 
         out = jumplengthmodel.fit(y.flatten(), x=x, params=pars) ## FIT
         ssq2 = (out.residual**2).sum()/out.residual.shape[0]
-        out.ssq2 = ssq2
+        out.params.ssq2 = ssq2
         
         ## See if the current fit is an improvement:
         if ssq2 < best_ssq2:
@@ -267,9 +273,9 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
     return out
 
 def simulate_jump_length_distribution(parameter_guess, JumpProb,
-                              HistVecJumpsCDF, HistVecJumps,
-                              dT, dZ, LocError, PDF_or_CDF,
-                              verbose=True):
+                                      HistVecJumpsCDF, HistVecJumps,
+                                      dT, dZ, LocError, PDF_or_CDF, a, b,
+                                      verbose=True):
     """Function 'SS_2State_model_Z_corr_v4' actually returns a distribution
     given the parameter_guess input. This function is to be used inside a
     least square fitting method, such as Matlab's `lsqcurvefit`.
@@ -294,7 +300,8 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     # Calculate the axial Z-correction
     # First calculate the corrected DeltaZ:
     ##DeltaZ_use = dZ + 0.15716  * D_FREE**.5 + 0.20811 # See CHANGELOG_fit
-    DeltaZ_use = dZ + 0.24472 * D_FREE**.5 + 0.19789
+    ##DeltaZ_use = dZ + 0.24472 * D_FREE**.5 + 0.19789
+    DeltaZ_use = dZ + a * D_FREE**.5 + b
     HalfDeltaZ_use = DeltaZ_use/2    
 
     for iterator in range(JumpProb.shape[0]): #=1:size(JumpProb,1):
@@ -368,7 +375,7 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     return Binned_y
 
 def generate_jump_length_distribution(D_free, D_bound, F_bound, JumpProb, r,
-                                LocError, dT, dZ):
+                                      LocError, dT, dZ, a, b):
     """
     Anybody really interested in what is really
     happening would notice that this function is only generating a distribution
@@ -380,7 +387,7 @@ def generate_jump_length_distribution(D_free, D_bound, F_bound, JumpProb, r,
     Z_corr = np.zeros(JumpProb.shape[0]) # Assume ABSORBING BOUNDARIES
 
     # Calculate the axial Z-correction
-    DeltaZ_use = dZ + 0.15716  * D_free**.5 + 0.20811 # See CHANGELOG_fit
+    DeltaZ_use = dZ + a  * D_free**.5 + b # See CHANGELOG_fit
     HalfDeltaZ_use = DeltaZ_use/2
 
     for iterator in range(JumpProb.shape[0]):
@@ -424,7 +431,17 @@ def C_AbsorBoundAUTO(z, CurrTime, D, halfZ):
     
     while np.abs(f) > WhenToStop:
         #print ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5, ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5 ## DBG
-        f = ((-1)**n) * ( erfc( ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5) +  erfc( ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5) )
+        if CurrTime != 0:
+            z1 =  ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5
+            z2 =  ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5
+        elif (2*n+1)*halfZ-z<0:
+            z1 = -np.inf
+            z2 = np.inf
+        else:
+            z1 = np.inf
+            z2 = np.inf
+            
+        f = ((-1)**n) * ( erfc(z1) +  erfc(z2) )
         h -= f
         n += 1
     return h
