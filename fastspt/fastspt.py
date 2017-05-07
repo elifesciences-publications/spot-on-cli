@@ -174,18 +174,19 @@ def compute_jump_length_distribution(trackedPar,
 
 def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
-                                 D_Free, D_Bound, Frac_Bound,
+                                 LB, UB,
+                                 #D_Free, D_Bound, Frac_Bound,
                                  LocError, iterations, dT, dZ, ModelFit, a, b,
-                                 verbose=True):
+                                 fit2states=True, verbose=True):
     """Fits a kinetic model to an empirical jump length distribution.
 
     This applies a non-linear least squared fitting procedure.
     """
     ## Lower and Upper parameter bounds
     ## /!\ TODO MW: these are specific to the Matlab least square solver
-    LB = np.array([D_Free[0], D_Bound[0], Frac_Bound[0]])
-    UB = np.array([D_Free[1], D_Bound[1], Frac_Bound[1]])
-    diff = UB - LB   # difference: used for initial parameters guess
+    #LB = np.array([D_Free[0], D_Bound[0], Frac_Bound[0]])
+    #UB = np.array([D_Free[1], D_Bound[1], Frac_Bound[1]])
+    diff = np.array(UB) - np.array(LB)   # difference: used for initial parameters guess
     best_ssq2 = 5e10 # initial error
 
     # Need to ensure that the x-input is the same size as y-output
@@ -217,7 +218,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
               "b": b}
 
     ## ==== Get ready for the fitting
-    def wrapped_jump_length(x, D_free, D_bound, F_bound):
+    def wrapped_jump_length_2states(x, D_free, D_bound, F_bound):
         """Wrapper for the main fit function (assuming global variables)"""
         if params['PDF_or_CDF'] == 1: # PDF fit
             dis = simulate_jump_length_distribution(
@@ -230,7 +231,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], verbose=False)
+                params['b'], fit2states=True, verbose=False)
         elif params['PDF_or_CDF'] == 2: # CDF fit
             dis = simulate_jump_length_distribution(
                 (D_free, D_bound, F_bound), 
@@ -242,18 +243,60 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], verbose=False)
+                params['b'], fit2states=True, verbose=False)
         return dis.flatten()
     
-    jumplengthmodel = lmfit.Model(wrapped_jump_length) ## Instantiate model
-    pars = jumplengthmodel.make_params() ## Create an empty set of params
-
+    def wrapped_jump_length_3states(x, D_fast, D_med, D_bound, F_fast, F_bound):
+        """Wrapper for the main fit function (assuming global variables)"""
+        if params['PDF_or_CDF'] == 1: # PDF fit
+            dis = simulate_jump_length_distribution(
+                (D_fast, D_med, D_bound, F_fast, F_bound), 
+                params['JumpProb'],
+                params['HistVecJumpsCDF'],
+                params['HistVecJumps'],
+                params['dT'],
+                params['dZ'],
+                params['LocError'],
+                params['PDF_or_CDF'],
+                params['a'],
+                params['b'], fit2states=False, verbose=False)
+        elif params['PDF_or_CDF'] == 2: # CDF fit
+            dis = simulate_jump_length_distribution(
+                (D_fast, D_med, D_bound, F_fast, F_bound), 
+                params['JumpProbCDF'],
+                params['HistVecJumpsCDF'],
+                params['HistVecJumps'],
+                params['dT'],
+                params['dZ'],
+                params['LocError'],
+                params['PDF_or_CDF'],
+                params['a'],
+                params['b'], fit2states=False, verbose=False)
+        return dis.flatten()
+    
+    if fit2states: # Instantiate model
+        jumplengthmodel = lmfit.Model(wrapped_jump_length_2states) 
+        pars = jumplengthmodel.make_params() ## Create an empty set of params
+    else:
+        jumplengthmodel = lmfit.Model(wrapped_jump_length_3states) 
+        pars = jumplengthmodel.make_params() ## Create an empty set of params
+        
     for i in range(iterations):
         guess = np.random.rand(len(LB))*diff+LB ## Guess a random set of parameters
-        pars['D_free'] .set(min=LB[0], max=UB[0], value=guess[0])
-        pars['D_bound'].set(min=LB[1], max=UB[1], value=guess[1])
-        pars['F_bound'].set(min=LB[2], max=UB[2], value=guess[2])
-
+        if fit2states:
+            pars['D_free'] .set(min=LB[0], max=UB[0], value=guess[0])
+            pars['D_bound'].set(min=LB[1], max=UB[1], value=guess[1])
+            pars['F_bound'].set(min=LB[2], max=UB[2], value=guess[2])
+        else:
+            pars['D_fast'] .set(min=LB[0], max=UB[0], value=guess[0])
+            pars['D_med']  .set(min=LB[1], max=UB[1], value=guess[1])
+            pars['D_bound'].set(min=LB[2], max=UB[2], value=guess[2])            
+            pars['F_fast'] .set(min=LB[3], max=UB[3], value=guess[3])
+            #pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
+            pars.add('delta', min=0, max=1, value=0.5)
+            #pars.add('gamma', expr='delta-F_bound-F_fast')
+            pars['F_bound'].set(expr='abs(delta-F_fast)')
+            
         out = jumplengthmodel.fit(y.flatten(), x=x, params=pars) ## FIT
         ssq2 = (out.residual**2).sum()/out.residual.shape[0]
         out.params.ssq2 = ssq2
@@ -272,13 +315,54 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 print('Cell {}: Iteration {} did not yield an improved fit'.format(CellNumb+1, i+1))
     return out
 
+def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError):
+    """Subroutine for simulate_jump_distribution"""
+    ## ==== Compute the integral
+    HalfDeltaZ_use = DeltaZ_use/2.
+    xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
+    yint = [C_AbsorBoundAUTO(i, curr_dT, D_FREE, HalfDeltaZ_use)*1e-3 for i in xint]
+    Z_corr = 1/DeltaZ_use * np.array(yint).sum() # see below
+    
+    # update the function output
+    y1 = Z_corr * (1-F_BOUND) * (r/(2*(D_FREE*curr_dT+LocError**2)))
+    y2 = np.exp( -(r**2)/(4*(D_FREE*curr_dT+LocError**2)))
+    y3 = F_BOUND*(r /(2*(D_BOUND*curr_dT+LocError**2)))
+    y4 = np.exp(-(r**2)/(4*(D_BOUND*curr_dT+LocError**2)))
+
+    return y1*y2 + y3*y4
+    
+def _compute_3states(D_FAST, D_MED, D_BOUND, F_FAST, F_BOUND,
+                     curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError):
+    """Subroutine for simulate_jump_distribution"""
+    ## ==== Compute the integral
+    HalfDeltaZ_useFAST = DeltaZ_useFAST/2.
+    xintFAST = np.arange(-HalfDeltaZ_useFAST, HalfDeltaZ_useFAST, 4e-2)
+    yintFAST = [C_AbsorBoundAUTO(i, curr_dT, D_FAST, HalfDeltaZ_useFAST)*4e-2 for i in xintFAST]
+    Z_corrFAST = 1/DeltaZ_useFAST * np.array(yintFAST).sum()
+
+    HalfDeltaZ_useMED = DeltaZ_useMED/2.
+    xintMED = np.arange(-HalfDeltaZ_useMED, HalfDeltaZ_useMED, 4e-2)
+    yintMED = [C_AbsorBoundAUTO(i, curr_dT, D_MED, HalfDeltaZ_useMED)*4e-2 for i in xintMED]
+    Z_corrMED = 1/DeltaZ_useMED * np.array(yintMED).sum()
+    
+    # update the function output
+    y1 = F_BOUND*(r /(2*(D_BOUND*curr_dT+LocError**2)))
+    y2 = np.exp(-(r**2)/(4*(D_BOUND*curr_dT+LocError**2)))
+    y3 = Z_corrFAST * F_FAST * (r/(2*(D_FAST*curr_dT+LocError**2)))
+    y4 = np.exp( -(r**2)/(4*(D_FAST*curr_dT+LocError**2)))
+    y5 = Z_corrMED * (1-F_FAST-F_BOUND) * (r/(2*(D_MED*curr_dT+LocError**2)))
+    y6 = np.exp( -(r**2)/(4*(D_MED*curr_dT+LocError**2)))
+    
+    return y1*y2 + y3*y4
+
 def simulate_jump_length_distribution(parameter_guess, JumpProb,
                                       HistVecJumpsCDF, HistVecJumps,
                                       dT, dZ, LocError, PDF_or_CDF, a, b,
-                                      verbose=True):
+                                      fit2states = True, verbose=True):
     """Function 'SS_2State_model_Z_corr_v4' actually returns a distribution
     given the parameter_guess input. This function is to be used inside a
-    least square fitting method, such as Matlab's `lsqcurvefit`.
+    least square fitting method, such as Matlab's `lsqcurvefit` or 
+    Python's `lmfit`.
     
     Note that this function assumes some *global variables* that are provided
     by the main script: LocError dT HistVecJumps dZ HistVecJumpsCDF PDF_or_CDF
@@ -289,53 +373,41 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     y = np.zeros((JumpProb.shape[0], len(r)))
     Binned_y_PDF = np.zeros((JumpProb.shape[0], JumpProb.shape[1]))
 
-    D_FREE  = parameter_guess[0]
-    D_BOUND = parameter_guess[1]
-    F_BOUND = parameter_guess[2]
-
-    # Assume ABSORBING BOUNDARIES
-    Z_corr = np.zeros(JumpProb.shape[0])
+    if fit2states:
+        D_FREE  = parameter_guess[0]
+        D_BOUND = parameter_guess[1]
+        F_BOUND = parameter_guess[2]
+    else:
+        D_FAST  = parameter_guess[0]
+        D_MED   = parameter_guess[1]
+        D_BOUND = parameter_guess[2]
+        F_FAST  = parameter_guess[3]
+        F_BOUND = parameter_guess[4]
 
     # ==== Precompute stuff
     # Calculate the axial Z-correction
     # First calculate the corrected DeltaZ:
     ##DeltaZ_use = dZ + 0.15716  * D_FREE**.5 + 0.20811 # See CHANGELOG_fit
     ##DeltaZ_use = dZ + 0.24472 * D_FREE**.5 + 0.19789
-    DeltaZ_use = dZ + a * D_FREE**.5 + b
-    HalfDeltaZ_use = DeltaZ_use/2    
+    if fit2states:
+        DeltaZ_use = dZ + a * D_FREE**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
+    else:
+        DeltaZ_useFAST = dZ + a * D_FAST**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
+        DeltaZ_useMED = dZ + a * D_MED**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
 
-    for iterator in range(JumpProb.shape[0]): #=1:size(JumpProb,1):
+    for iterator in range(JumpProb.shape[0]):
         # Calculate the jump length distribution of the parameters for each
         # time-jump
         curr_dT = (iterator+1)*dT
         if verbose:
             print "-- computing dT = {} ({}/{})".format(curr_dT, iterator+1, JumpProb.shape[0])
-        
-        ## ==== Compute the integral
-        # Getting the theoretical bounds of the integral so that I can properly
-        # compute in the first place the erfc
-        # - z \in [-HalfDeltaZ_use, HalfDeltaZ_use]
-        # - currTime \in [0, JumpProb.shape[0]*dT -> [0, 0.03]
-        # - D \in [0.15, 25]
-        # - halfZ \in [0.3, 1.7]
-        #print JumpProb.shape[0]*dT
-        #print dZ + 0.15716 * 0.15**.5 + 0.20811, dZ + 0.15716 * 25**.5 + 0.20811
-
-        xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
-        yint = [C_AbsorBoundAUTO(i, curr_dT, D_FREE, HalfDeltaZ_use)*1e-3 for i in xint]
-        
-        Z_corr[iterator] = 1/DeltaZ_use * np.array(yint).sum() # see below
-        #1/DeltaZ_use * integral(@(z)C_AbsorBoundAUTO(z,curr_dT, D_FREE, HalfDeltaZ_use),-HalfDeltaZ_use,HalfDeltaZ_use);
-    
-        # update the function output
-        #print Z_corr[iterator], (1-F_BOUND), D_FREE, curr_dT, LocError, D_BOUND
-        y1 = Z_corr[iterator] * (1-F_BOUND) * (r/(2*(D_FREE*curr_dT+LocError**2)))
-        y2 = np.exp( -(r**2)/(4*(D_FREE*curr_dT+LocError**2)))
-        y3 = F_BOUND*(r /(2*(D_BOUND*curr_dT+LocError**2)))
-        y4 = np.exp(-(r**2)/(4*(D_BOUND*curr_dT+LocError**2)))
-        
-        y[iterator,:] = y1*y2 + y3*y4
-        #Z_corr[iterator] * (1-F_BOUND) * (r/(2*(D_FREE*curr_dT+LocError^2))) * exp(-(r^2.)/(4*(D_FREE*curr_dT+LocError^2.))) + F_BOUND*(r/(2*(D_BOUND*curr_dT+LocError^2.)))*exp(-(r^2.)/(4*(D_BOUND*curr_dT+LocError^2.)))
+        if fit2states:
+            y[iterator,:] = _compute_2states(D_FREE, D_BOUND, F_BOUND,
+                                             curr_dT, r, DeltaZ_use, LocError)
+        else:
+            y[iterator,:] = _compute_3states(D_FAST, D_MED, D_BOUND,
+                                             F_FAST, F_BOUND,
+                                             curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError)
 
     if PDF_or_CDF == 1:
 	## Now bin the output y so that it matches the JumpProb variable: 
@@ -344,8 +416,6 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
 		if j == (JumpProb.shape[1]-1):
 		    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
 		else:
-		    #[~, minIndex] = min(abs(r-HistVecJumps(j)));
-		    #[~, maxIndex] = min(abs(r-HistVecJumps(j+1)));
                     minIndex = np.argmin(np.abs(r-HistVecJumps[j]))
                     maxIndex = np.argmin(np.abs(r-HistVecJumps[j+1]))
 		    Binned_y_PDF[i,j] = y[i,minIndex:maxIndex].mean()
@@ -367,48 +437,69 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     
         ## calculate the CDF
         for i in range(Binned_y_CDF.shape[0]): #1:size(Binned_y_CDF,1):
-            for j in range(1, Binned_y_CDF.shape[1]): #=2:size(Binned_y_CDF,2):
-                Binned_y_CDF[i,j] = Binned_y_PDF[i,:j].sum()
-
+            Binned_y_CDF[i,:] = np.cumsum(Binned_y_PDF[i,:])
+            #for j in range(1, Binned_y_CDF.shape[1]): #=2:size(Binned_y_CDF,2):
+            #    Binned_y_CDF[i,j] = Binned_y_PDF[i,:j].sum()
         Binned_y = Binned_y_CDF ##Output the final variable
 
     return Binned_y
 
-def generate_jump_length_distribution(D_free, D_bound, F_bound, JumpProb, r,
-                                      LocError, dT, dZ, a, b):
+def generate_jump_length_distribution(fitparams, JumpProb, r,
+                                      LocError, dT, dZ, a, b, fit2states=True):
     """
     Anybody really interested in what is really
     happening would notice that this function is only generating a distribution
     and thus this code is in a way redundant with the one of the fitting procedure.
     /!\ TODO MW: remove this redundancy
     """
+    if fit2states:
+        D_free = fitparams['D_free']
+        D_bound = fitparams['D_bound']
+        F_bound = fitparams['F_bound']
+    else:
+        D_fast = fitparams['D_fast']
+        D_med = fitparams['D_med']
+        D_bound = fitparams['D_bound']
+        F_fast = fitparams['F_fast']
+        F_bound = fitparams['F_bound']
 
     y = np.zeros((JumpProb.shape[0], r.shape[0]))
-    Z_corr = np.zeros(JumpProb.shape[0]) # Assume ABSORBING BOUNDARIES
+    #Z_corr = np.zeros(JumpProb.shape[0]) # Assume ABSORBING BOUNDARIES
 
     # Calculate the axial Z-correction
-    DeltaZ_use = dZ + a  * D_free**.5 + b # See CHANGELOG_fit
-    HalfDeltaZ_use = DeltaZ_use/2
+    if fit2states:
+        DeltaZ_use = dZ + a * D_free**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
+    else:
+        DeltaZ_useFAST = dZ + a * D_fast**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
+        DeltaZ_useMED = dZ + a * D_med**.5 + b #HalfDeltaZ_use = DeltaZ_use/2
 
     for iterator in range(JumpProb.shape[0]):
         # Calculate the jump length distribution of the parameters for each
         # time-jump
         curr_dT = (iterator+1)*dT
 
-        ## ==== Compute the integral
-        xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
-        yint = [C_AbsorBoundAUTO(i, curr_dT, D_free, HalfDeltaZ_use)*1e-3 for i in xint]
-        Z_corr[iterator] = 1/DeltaZ_use * np.array(yint).sum()
-        #Z_corr(1,iterator) =  1/DeltaZ_use * integral(@(z)C_AbsorBoundAUTO(z,curr_dT, D_free, HalfDeltaZ_use),-HalfDeltaZ_use,HalfDeltaZ_use);
-    
-        ## ==== update the function output
-        y1 = Z_corr[iterator] * (1-F_bound) * (r/(2*(D_free*curr_dT+LocError**2)))
-        y2 = np.exp( -(r**2)/(4*(D_free*curr_dT+LocError**2)))
-        y3 = F_bound*(r /(2*(D_bound*curr_dT+LocError**2)))
-        y4 = np.exp(-(r**2)/(4*(D_bound*curr_dT+LocError**2)))
+        if fit2states:
+            y[iterator,:] = _compute_2states(D_free, D_bound, F_bound,
+                                             curr_dT, r, DeltaZ_use, LocError)
+        else:
+            y[iterator,:] = _compute_3states(D_fast, D_med, D_bound,
+                                             F_fast, F_bound,
+                                             curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError)
+
         
-        y[iterator,:] = y1*y2 + y3*y4        
-        #y(iterator,:) = Z_corr(1,iterator) .* (1-F_bound).*(r./(2*(D_free*curr_dT+LocError^2))).*exp(-r.^2./(4*(D_free*curr_dT+LocError^2))) + F_bound.*(r./(2*(D_bound*curr_dT+LocError^2))).*exp(-r.^2./(4*(D_bound*curr_dT+LocError^2))) ;
+
+        # ## ==== Compute the integral
+        # xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
+        # yint = [C_AbsorBoundAUTO(i, curr_dT, D_free, HalfDeltaZ_use)*1e-3 for i in xint]
+        # Z_corr = 1/DeltaZ_use * np.array(yint).sum()
+    
+        # ## ==== update the function output
+        # y1 = Z_corr * (1-F_bound) * (r/(2*(D_free*curr_dT+LocError**2)))
+        # y2 = np.exp( -(r**2)/(4*(D_free*curr_dT+LocError**2)))
+        # y3 = F_bound*(r /(2*(D_bound*curr_dT+LocError**2)))
+        # y4 = np.exp(-(r**2)/(4*(D_bound*curr_dT+LocError**2)))
+        
+        # y[iterator,:] = y1*y2 + y3*y4        
     return y
 
 
