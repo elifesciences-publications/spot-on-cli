@@ -175,11 +175,9 @@ def compute_jump_length_distribution(trackedPar,
 def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
                                  LB, UB,
-                                 #D_Free, D_Bound, Frac_Bound,
                                  LocError, iterations, dT, dZ, ModelFit, a, b,
                                  fit2states=True, verbose=True):
     """Fits a kinetic model to an empirical jump length distribution.
-
     This applies a non-linear least squared fitting procedure.
     """
     ## Lower and Upper parameter bounds
@@ -246,7 +244,8 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['b'], fit2states=True, verbose=False)
         return dis.flatten()
     
-    def wrapped_jump_length_3states(x, D_fast, D_med, D_bound, F_fast, F_bound):
+    def wrapped_jump_length_3states(x, D_fast, D_med, D_bound,
+                                    F_fast, F_bound):
         """Wrapper for the main fit function (assuming global variables)"""
         if params['PDF_or_CDF'] == 1: # PDF fit
             dis = simulate_jump_length_distribution(
@@ -272,14 +271,19 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['PDF_or_CDF'],
                 params['a'],
                 params['b'], fit2states=False, verbose=False)
-        return dis.flatten()
+        if F_fast+F_bound<1:
+            return np.hstack((dis.flatten(), 0))
+        else:
+            return np.hstack((dis.flatten(), 10000*(1-F_fast-F_bound)))
     
     if fit2states: # Instantiate model
         jumplengthmodel = lmfit.Model(wrapped_jump_length_2states) 
         pars = jumplengthmodel.make_params() ## Create an empty set of params
+        y_init = y.flatten()
     else:
         jumplengthmodel = lmfit.Model(wrapped_jump_length_3states) 
         pars = jumplengthmodel.make_params() ## Create an empty set of params
+        y_init = np.hstack((y.flatten(), 0))
         
     for i in range(iterations):
         guess = np.random.rand(len(LB))*diff+LB ## Guess a random set of parameters
@@ -291,14 +295,11 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
             pars['D_fast'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_med']  .set(min=LB[1], max=UB[1], value=guess[1])
             pars['D_bound'].set(min=LB[2], max=UB[2], value=guess[2])            
+            pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
             pars['F_fast'] .set(min=LB[3], max=UB[3], value=guess[3])
-            #pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
-            pars.add('delta', min=0, max=1, value=0.5)
-            #pars.add('gamma', expr='delta-F_bound-F_fast')
-            pars['F_bound'].set(expr='abs(delta-F_fast)')
             
-        out = jumplengthmodel.fit(y.flatten(), x=x, params=pars) ## FIT
-        ssq2 = (out.residual**2).sum()/out.residual.shape[0]
+        out = jumplengthmodel.fit(y_init, x=x, params=pars) ## FIT
+        ssq2 = (out.residual[:-1]**2).sum()/(out.residual.shape[0]-1)
         out.params.ssq2 = ssq2
         
         ## See if the current fit is an improvement:
@@ -311,8 +312,8 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 print('Improved error is {}'.format(ssq2))
                 print out.params.pretty_print(columns=['value', 'min', 'max', 'stderr'])
                 print('==================================================')
-            else:
-                print('Cell {}: Iteration {} did not yield an improved fit'.format(CellNumb+1, i+1))
+        else:
+            print('Iteration {} did not yield an improved fit'.format(i+1))
     return out
 
 def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError):
@@ -353,7 +354,7 @@ def _compute_3states(D_FAST, D_MED, D_BOUND, F_FAST, F_BOUND,
     y5 = Z_corrMED * (1-F_FAST-F_BOUND) * (r/(2*(D_MED*curr_dT+LocError**2)))
     y6 = np.exp( -(r**2)/(4*(D_MED*curr_dT+LocError**2)))
     
-    return y1*y2 + y3*y4
+    return y1*y2 + y3*y4 + y5*y6
 
 def simulate_jump_length_distribution(parameter_guess, JumpProb,
                                       HistVecJumpsCDF, HistVecJumps,
@@ -521,7 +522,6 @@ def C_AbsorBoundAUTO(z, CurrTime, D, halfZ):
     h = 1
     
     while np.abs(f) > WhenToStop:
-        #print ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5, ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5 ## DBG
         if CurrTime != 0:
             z1 =  ((2*n+1)*halfZ-z)/(4*D*CurrTime)**.5
             z2 =  ((2*n+1)*halfZ+z)/(4*D*CurrTime)**.5
@@ -536,6 +536,3 @@ def C_AbsorBoundAUTO(z, CurrTime, D, halfZ):
         h -= f
         n += 1
     return h
-
-
-#(-1)^n * ( erfc( ((2*n+1)*halfZ-z)/sqrt(4*D*CurrTime)) +  erfc( ((2*n+1)*halfZ+z)/sqrt(4*D*CurrTime))  );
