@@ -332,8 +332,9 @@ def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError)
     """Subroutine for simulate_jump_distribution"""
     ## ==== Compute the integral
     HalfDeltaZ_use = DeltaZ_use/2.
-    xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
-    yint = [C_AbsorBoundAUTO(i, curr_dT, D_FREE, HalfDeltaZ_use)*1e-3 for i in xint]
+    stp = DeltaZ_use/200.
+    xint = np.linspace(-HalfDeltaZ_use, HalfDeltaZ_use, 200)
+    yint = [C_AbsorBoundAUTO(i, curr_dT, D_FREE, HalfDeltaZ_use)*stp for i in xint]
     Z_corr = 1/DeltaZ_use * np.array(yint).sum() # see below
     
     # update the function output
