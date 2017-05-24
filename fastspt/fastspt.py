@@ -176,7 +176,11 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
                                  LB, UB,
                                  LocError, iterations, dT, dZ, ModelFit, a, b,
-                                 fit2states=True, verbose=True):
+                                 fit2states=True, verbose=True, init=None,
+                                 solverparams = {'ftol':1e-20,
+                                                 'xtol': 1e-20,
+                                                 'maxfev': 100000,
+                                             }):
     """Fits a kinetic model to an empirical jump length distribution.
     This applies a non-linear least squared fitting procedure.
     """
@@ -284,21 +288,29 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         jumplengthmodel = lmfit.Model(wrapped_jump_length_3states) 
         pars = jumplengthmodel.make_params() ## Create an empty set of params
         y_init = np.hstack((y.flatten(), 0))
-        
-    for i in range(iterations):
-        guess = np.random.rand(len(LB))*diff+LB ## Guess a random set of parameters
+
+    if init == None:
+        init = [np.random.rand(len(LB))*diff+LB for i in range(iterations)]
+    elif len(init) != iterations:
+        print "'iterations' variable ignored because 'init' is provided and has length {}".format(len(init))
+    for (i,guess) in enumerate(init):
         if fit2states:
+            if guess.shape[0] != 3:
+                print "init value has a wrong number of elements"
             pars['D_free'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_bound'].set(min=LB[1], max=UB[1], value=guess[1])
             pars['F_bound'].set(min=LB[2], max=UB[2], value=guess[2])
         else:
+            if guess.shape[0] != 5:
+                print "init value has a wrong number of elements"
             pars['D_fast'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_med']  .set(min=LB[1], max=UB[1], value=guess[1])
             pars['D_bound'].set(min=LB[2], max=UB[2], value=guess[2])            
             pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
             pars['F_fast'] .set(min=LB[3], max=UB[3], value=guess[3])
-            
-        out = jumplengthmodel.fit(y_init, x=x, params=pars) ## FIT
+
+        print "8.2"
+        out = jumplengthmodel.fit(y_init, x=x, params=pars, fit_kws=solverparams)
         ssq2 = (out.residual[:-1]**2).sum()/(out.residual.shape[0]-1)
         out.params.ssq2 = ssq2
         
@@ -408,24 +420,26 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
         else:
             y[iterator,:] = _compute_3states(D_FAST, D_MED, D_BOUND,
                                              F_FAST, F_BOUND,
-                                             curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError)
+                                             curr_dT, r, DeltaZ_useFAST,
+                                             DeltaZ_useMED, LocError)
 
     if PDF_or_CDF == 1:
-	## Now bin the output y so that it matches the JumpProb variable: 
-	for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
-	    for j in range(JumpProb.shape[1]): #=1:size(JumpProb,2)
-		if j == (JumpProb.shape[1]-1):
-		    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
-		else:
-                    minIndex = np.argmin(np.abs(r-HistVecJumps[j]))
-                    maxIndex = np.argmin(np.abs(r-HistVecJumps[j+1]))
-		    Binned_y_PDF[i,j] = y[i,minIndex:maxIndex].mean()
-
-	## Normalize:
-	for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
-	    Binned_y_PDF[i,:] = Binned_y_PDF[i,:]/sum(Binned_y_PDF[i,:]);
-
-        Binned_y = Binned_y_PDF #You want to fit to a histogram, so no need to calculate the CDF
+        norm_y = np.zeros_like(y)
+        for i in range(y.shape[0]): # Normalize y as a PDF
+            norm_y[i,:] = y[i,:]/y[i,:].sum()        
+	## Now bin the output y so that it matches the JumpProb variable:
+	# for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
+	#     for j in range(JumpProb.shape[1]): #=1:size(JumpProb,2)
+	# 	if j == (JumpProb.shape[1]-1):
+	# 	    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
+	# 	else:
+        #             minIndex = np.argmin(np.abs(r-HistVecJumps[j]))
+        #             maxIndex = np.argmin(np.abs(r-HistVecJumps[j+1]))
+	# 	    Binned_y_PDF[i,j] = y[i,minIndex:maxIndex].mean()
+	# for i in range(JumpProb.shape[0]): #1:size(JumpProb,1) ## Normalize
+	#     Binned_y_PDF[i,:] = Binned_y_PDF[i,:]/sum(Binned_y_PDF[i,:]);
+        # Binned_y = Binned_y_PDF #You want to fit to a histogram, so no need to calculate the CDF
+        return norm_y
 
     elif PDF_or_CDF == 2:
         # You want to fit to a CDF function, so first we must calculate the CDF
@@ -446,12 +460,10 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     return Binned_y
 
 def generate_jump_length_distribution(fitparams, JumpProb, r,
-                                      LocError, dT, dZ, a, b, fit2states=True):
+                                      LocError, dT, dZ, a, b, fit2states=True,
+                                      norm=False):
     """
-    Anybody really interested in what is really
-    happening would notice that this function is only generating a distribution
-    and thus this code is in a way redundant with the one of the fitting procedure.
-    /!\ TODO MW: remove this redundancy
+    This function has no docstring. This is bad
     """
     if fit2states:
         D_free = fitparams['D_free']
@@ -485,22 +497,15 @@ def generate_jump_length_distribution(fitparams, JumpProb, r,
         else:
             y[iterator,:] = _compute_3states(D_fast, D_med, D_bound,
                                              F_fast, F_bound,
-                                             curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError)
+                                             curr_dT, r, DeltaZ_useFAST,
+                                             DeltaZ_useMED, LocError)
 
-        
-
-        # ## ==== Compute the integral
-        # xint = np.arange(-HalfDeltaZ_use, HalfDeltaZ_use, 1e-3)
-        # yint = [C_AbsorBoundAUTO(i, curr_dT, D_free, HalfDeltaZ_use)*1e-3 for i in xint]
-        # Z_corr = 1/DeltaZ_use * np.array(yint).sum()
-    
-        # ## ==== update the function output
-        # y1 = Z_corr * (1-F_bound) * (r/(2*(D_free*curr_dT+LocError**2)))
-        # y2 = np.exp( -(r**2)/(4*(D_free*curr_dT+LocError**2)))
-        # y3 = F_bound*(r /(2*(D_bound*curr_dT+LocError**2)))
-        # y4 = np.exp(-(r**2)/(4*(D_bound*curr_dT+LocError**2)))
-        
-        # y[iterator,:] = y1*y2 + y3*y4        
+        if norm:
+            norm_y = np.zeros_like(y)
+            for i in range(y.shape[0]): # Normalize y as a PDF
+                norm_y[i,:] = y[i,:]/y[i,:].sum()
+            #scaled_y = (float(len(HistVecJumpsCDF))/len(HistVecJumps))*norm_y #scale y for plotting next to histograms
+            y = norm_y
     return y
 
 
