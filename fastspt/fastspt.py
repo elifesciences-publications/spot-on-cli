@@ -370,7 +370,7 @@ def _compute_3states(D_FAST, D_MED, D_BOUND, F_FAST, F_BOUND,
     return y1*y2 + y3*y4 + y5*y6
 
 def simulate_jump_length_distribution(parameter_guess, JumpProb,
-                                      HistVecJumpsCDF, HistVecJumps,
+                                      HistVecJumpsCDF, HistVecJump,
                                       dT, dZ, LocError, PDF_or_CDF, a, b,
                                       fit2states = True, verbose=True):
     """Function 'SS_2State_model_Z_corr_v4' actually returns a distribution
@@ -382,8 +382,11 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
     by the main script: LocError dT HistVecJumps dZ HistVecJumpsCDF PDF_or_CDF
     """
 
-    # ==== Initialize stuff    
-    r = HistVecJumpsCDF
+    # ==== Initialize stuff
+    HistVecJumps = HistVecJump.copy()
+    HistVecJumps += HistVecJumps[1]/2.
+    r = HistVecJumpsCDF.copy()
+    r += r[1]/2.
     y = np.zeros((JumpProb.shape[0], len(r)))
     Binned_y_PDF = np.zeros((JumpProb.shape[0], JumpProb.shape[1]))
 
