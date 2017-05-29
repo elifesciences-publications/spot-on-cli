@@ -427,22 +427,22 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
                                              DeltaZ_useMED, LocError)
 
     if PDF_or_CDF == 1:
-        norm_y = np.zeros_like(y)
-        for i in range(y.shape[0]): # Normalize y as a PDF
-            norm_y[i,:] = y[i,:]/y[i,:].sum()        
-	## Now bin the output y so that it matches the JumpProb variable:
-	# for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
-	#     for j in range(JumpProb.shape[1]): #=1:size(JumpProb,2)
-	# 	if j == (JumpProb.shape[1]-1):
-	# 	    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
-	# 	else:
-        #             minIndex = np.argmin(np.abs(r-HistVecJumps[j]))
-        #             maxIndex = np.argmin(np.abs(r-HistVecJumps[j+1]))
-	# 	    Binned_y_PDF[i,j] = y[i,minIndex:maxIndex].mean()
-	# for i in range(JumpProb.shape[0]): #1:size(JumpProb,1) ## Normalize
-	#     Binned_y_PDF[i,:] = Binned_y_PDF[i,:]/sum(Binned_y_PDF[i,:]);
-        # Binned_y = Binned_y_PDF #You want to fit to a histogram, so no need to calculate the CDF
-        return norm_y
+        # norm_y = np.zeros_like(y)
+        # for i in range(y.shape[0]): # Normalize y as a PDF
+        #     norm_y[i,:] = y[i,:]/y[i,:].sum()        
+	#Now bin the output y so that it matches the JumpProb variable:
+	for i in range(JumpProb.shape[0]): #1:size(JumpProb,1)
+	    for j in range(JumpProb.shape[1]): #=1:size(JumpProb,2)
+		if j == (JumpProb.shape[1]-1):
+		    Binned_y_PDF[i,j] = y[i,maxIndex:].mean()
+		else:
+                    minIndex = np.argmin(np.abs(r-HistVecJumps[j]))
+                    maxIndex = np.argmin(np.abs(r-HistVecJumps[j+1]))
+		    Binned_y_PDF[i,j] = y[i,minIndex:maxIndex].mean()
+	for i in range(JumpProb.shape[0]): #1:size(JumpProb,1) ## Normalize
+	    Binned_y_PDF[i,:] = Binned_y_PDF[i,:]/sum(Binned_y_PDF[i,:]);
+        Binned_y = Binned_y_PDF #You want to fit to a histogram, so no need to calculate the CDF
+        return Binned_y
 
     elif PDF_or_CDF == 2:
         # You want to fit to a CDF function, so first we must calculate the CDF
@@ -507,6 +507,7 @@ def generate_jump_length_distribution(fitparams, JumpProb, r,
             norm_y = np.zeros_like(y)
             for i in range(y.shape[0]): # Normalize y as a PDF
                 norm_y[i,:] = y[i,:]/y[i,:].sum()
+            
             #scaled_y = (float(len(HistVecJumpsCDF))/len(HistVecJumps))*norm_y #scale y for plotting next to histograms
             y = norm_y
     return y
