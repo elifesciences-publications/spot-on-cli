@@ -309,7 +309,6 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
             pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
             pars['F_fast'] .set(min=LB[3], max=UB[3], value=guess[3])
 
-        print "8.2"
         out = jumplengthmodel.fit(y_init, x=x, params=pars, fit_kws=solverparams)
         ssq2 = (out.residual[:-1]**2).sum()/(out.residual.shape[0]-1)
         out.params.ssq2 = ssq2
