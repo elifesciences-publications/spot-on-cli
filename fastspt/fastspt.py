@@ -136,7 +136,7 @@ def compute_jump_length_distribution(trackedPar,
                         CurrFrameJump = trackedPar[i][2][0][k+n] - \
                                         trackedPar[i][2][0][k]
                         #trackedPar(i).Frame(k+n) - trackedPar(i).Frame(k);
-                        # Calculate the distance between the pair of points
+                        # Compute the distance between the pair of points
                         TransLengths[CurrFrameJump-1]["Step"].append(pdist(CurrXY_points))
 
     ## Calculate the PDF histograms (required for CDF)
