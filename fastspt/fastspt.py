@@ -54,7 +54,6 @@ def compute_jump_length_distribution(trackedPar,
     """
 
     PDF = not CDF
-    # CellNumb = 0
     tic = time.time() # Start the timer
 
 
@@ -72,8 +71,6 @@ def compute_jump_length_distribution(trackedPar,
     ##
     ## ==== Compile histograms for each jump lengths
     ##
-    #print('2. compiling histogram of jump lengths...') # DBG
-        
     Min3Traj = 0   #for counting number of min3 trajectories;
     CellJumps = 0  # for counting the total number of jumps
     TransFrames = TimePoints+GapsAllowed*(TimePoints-1)
@@ -176,7 +173,8 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
                                  LB, UB,
                                  LocError, iterations, dT, dZ, ModelFit, a, b,
-                                 fit2states=True, verbose=True, init=None,
+                                 fit2states=True, fitSigma=False,
+                                 verbose=True, init=None,
                                  solverparams = {'ftol':1e-20,
                                                  'xtol': 1e-20,
                                                  'maxfev': 100000,
@@ -185,9 +183,6 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
     This applies a non-linear least squared fitting procedure.
     """
     ## Lower and Upper parameter bounds
-    ## /!\ TODO MW: these are specific to the Matlab least square solver
-    #LB = np.array([D_Free[0], D_Bound[0], Frac_Bound[0]])
-    #UB = np.array([D_Free[1], D_Bound[1], Frac_Bound[1]])
     diff = np.array(UB) - np.array(LB)   # difference: used for initial parameters guess
     best_ssq2 = 5e10 # initial error
 
@@ -206,7 +201,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         y = JumpProbCDF
         x = np.repeat(HistVecJumpsCDF[:-1], JumpProbCDF.shape[1]) 
 
-    params = {"LocError": LocError,
+    params = {#"LocError": LocError,
               "dT": dT,
               "dZ": dZ,
               "HistVecJumps": HistVecJumps,
@@ -220,7 +215,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
               "b": b}
 
     ## ==== Get ready for the fitting
-    def wrapped_jump_length_2states(x, D_free, D_bound, F_bound):
+    def wrapped_jump_length_2states(x, D_free, D_bound, F_bound, sigma):
         """Wrapper for the main fit function (assuming global variables)"""
         if params['PDF_or_CDF'] == 1: # PDF fit
             dis = simulate_jump_length_distribution(
@@ -230,7 +225,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['HistVecJumps'],
                 params['dT'],
                 params['dZ'],
-                params['LocError'],
+                sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
                 params['b'], fit2states=True, verbose=False)
@@ -242,14 +237,14 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['HistVecJumps'],
                 params['dT'],
                 params['dZ'],
-                params['LocError'],
+                sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
                 params['b'], fit2states=True, verbose=False)
         return dis.flatten()
     
     def wrapped_jump_length_3states(x, D_fast, D_med, D_bound,
-                                    F_fast, F_bound):
+                                    F_fast, F_bound, sigma):
         """Wrapper for the main fit function (assuming global variables)"""
         if params['PDF_or_CDF'] == 1: # PDF fit
             dis = simulate_jump_length_distribution(
@@ -259,7 +254,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['HistVecJumps'],
                 params['dT'],
                 params['dZ'],
-                params['LocError'],
+                sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
                 params['b'], fit2states=False, verbose=False)
@@ -271,7 +266,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 params['HistVecJumps'],
                 params['dT'],
                 params['dZ'],
-                params['LocError'],
+                sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
                 params['b'], fit2states=False, verbose=False)
@@ -295,19 +290,27 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         print "'iterations' variable ignored because 'init' is provided and has length {}".format(len(init))
     for (i,guess) in enumerate(init):
         if fit2states:
-            if guess.shape[0] != 3:
+            if (guess.shape[0] != 3 and not fitSigma) or (guess.shape[0] != 4 and fitSigma): 
                 print "init value has a wrong number of elements"
             pars['D_free'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_bound'].set(min=LB[1], max=UB[1], value=guess[1])
             pars['F_bound'].set(min=LB[2], max=UB[2], value=guess[2])
+            if fitSigma:
+                pars['sigma'].set(min=LB[3], max=UB[3], value=guess[3])
+            else:
+                pars['sigma'].set(value=LocError, vary=False)
         else:
-            if guess.shape[0] != 5:
+            if (guess.shape[0] != 5 and not fitSigma) or (guess.shape[0] != 6 and fitSigma):
                 print "init value has a wrong number of elements"
             pars['D_fast'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_med']  .set(min=LB[1], max=UB[1], value=guess[1])
             pars['D_bound'].set(min=LB[2], max=UB[2], value=guess[2])            
             pars['F_bound'].set(min=LB[4], max=UB[4], value=guess[4])
             pars['F_fast'] .set(min=LB[3], max=UB[3], value=guess[3])
+            if fitSigma:
+                pars['sigma'].set(min=LB[5], max=UB[5], value=guess[5])
+            else:
+                pars['sigma'].set(value=LocError, vary=False)
 
         out = jumplengthmodel.fit(y_init, x=x, params=pars, fit_kws=solverparams)
         ssq2 = (out.residual[:-1]**2).sum()/(out.residual.shape[0]-1)
