@@ -1,2 +1,2 @@
 scipy
-lmfit
+lmfit==0.9.7
