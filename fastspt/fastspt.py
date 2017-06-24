@@ -32,7 +32,7 @@ def pdist(m):
 def compute_jump_length_distribution(trackedPar,
                                      CDF=False, useAllTraj=False, TimePoints=8,
                                      GapsAllowed=1, JumpsToConsider=4,
-                                     TimeGap=4.477, MaxJump=1.25, BinWidth=0.010):
+                                     MaxJump=1.25, BinWidth=0.010):
     """Function that takes a series of translocations and computes an histogram of
     jump lengths. Returns both
 
