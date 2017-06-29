@@ -285,9 +285,17 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         y_init = np.hstack((y.flatten(), 0))
 
     if init == None:
-        init = [np.random.rand(len(LB))*diff+LB for i in range(iterations)]
+        init = []
+        init1 = np.random.rand(len(LB))*diff+LB
+        while not fit2states and len(init)<iterations:
+            init1 = np.random.rand(len(LB))*diff+LB
+            if init1[3]+init1[4]<1:
+                init.append(init1)
+        if fit2states:
+            init = [np.random.rand(len(LB))*diff+LB for i in range(iterations)]
     elif len(init) != iterations:
         print "'iterations' variable ignored because 'init' is provided and has length {}".format(len(init))
+
     for (i,guess) in enumerate(init):
         if fit2states:
             if (guess.shape[0] != 3 and not fitSigma) or (guess.shape[0] != 4 and fitSigma): 
