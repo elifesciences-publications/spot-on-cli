@@ -17,7 +17,11 @@ Optional: jupyter
 
 Your package manager may provide precompiled versions of `numpy` and `scipy`. In that case, it might be worth using those libraries, because compilation can take a significant amount of time.
 
-# Installation
+# Installation (from pip)
+
+`pip install fastspt`
+
+# Installation (from this Gitlab) repository
 
 ## Install dependencies
 `pip install -r requirements.txt`
