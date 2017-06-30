@@ -9,21 +9,22 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
-import fastspt.version as version
+#import fastspt.version as version
 
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
-
+execfile("fastspt/version.py")
+print "Version", __version__
 setup(
     name='fastspt',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version=version.__version__,
+    version=__version__,#version.__version__,
 
     description='A library to perform kinetic modeling of fast single particle tracking experiments',
     long_description=long_description,
