@@ -168,7 +168,6 @@ def compute_jump_length_distribution(trackedPar,
         return [HistVecJumpsCDF,JumpProbCDF, HistVecJumps, JumpProb,
                 {'time': toc-tic}]
 
-
 def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  HistVecJumps, HistVecJumpsCDF,
                                  LB, UB,
@@ -201,8 +200,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         y = JumpProbCDF
         x = np.repeat(HistVecJumpsCDF[:-1], JumpProbCDF.shape[1]) 
 
-    params = {#"LocError": LocError,
-              "dT": dT,
+    params = {"dT": dT,
               "dZ": dZ,
               "HistVecJumps": HistVecJumps,
               "HistVecJumpsCDF": HistVecJumpsCDF,
@@ -297,6 +295,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         print "'iterations' variable ignored because 'init' is provided and has length {}".format(len(init))
 
     for (i,guess) in enumerate(init):
+        eps = 1e-8
         if fit2states:
             if (guess.shape[0] != 3 and not fitSigma) or (guess.shape[0] != 4 and fitSigma): 
                 print "init value has a wrong number of elements"
@@ -307,6 +306,10 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 pars['sigma'].set(min=LB[3], max=UB[3], value=guess[3])
             else:
                 pars['sigma'].set(value=LocError, vary=False)
+            if abs(LB[0]-UB[0])<eps:
+                pars['D_free'].set(value=LB[0], vary=False)
+            if abs(LB[1]-UB[1])<eps:
+                pars['D_bound'].set(value=LB[1], vary=False)
         else:
             if (guess.shape[0] != 5 and not fitSigma) or (guess.shape[0] != 6 and fitSigma):
                 print "init value has a wrong number of elements"
@@ -319,6 +322,12 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 pars['sigma'].set(min=LB[5], max=UB[5], value=guess[5])
             else:
                 pars['sigma'].set(value=LocError, vary=False)
+            if abs(LB[0]-UB[0])<eps:
+                pars['D_fast'].set(value=LB[0], vary=False)
+            if abs(LB[1]-UB[1])<eps:
+                pars['D_med'].set(value=LB[1], vary=False)
+            if abs(LB[2]-UB[2])<eps:
+                pars['D_bound'].set(value=LB[2], vary=False)
 
         out = jumplengthmodel.fit(y_init, x=x, params=pars, fit_kws=solverparams)
         ssq2 = (out.residual[:-1]**2).sum()/(out.residual.shape[0]-1)
