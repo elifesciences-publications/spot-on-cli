@@ -65,7 +65,7 @@ def plot_histogram(HistVecJumps, emp_hist, HistVecJumpsCDF=None, sim_hist=None,
             y1 = new_level
             y2 = JumpProb[i,j-1]+new_level
             plt.fill([x1, x1, x2, x2], [y1, y2, y2, y1], color=colour_element) # /!\ TODO MW: Should use different colours
-        if sim_hist != None: ## HistVecJumpsCDF should also be provided
+        if type(sim_hist) != type(None): ## HistVecJumpsCDF should also be provided
             plt.plot(HistVecJumpsCDF, scaled_y[i,:]+new_level, 'k-', linewidth=2)
         if TimeGap != None:
             plt.text(0.6*max(HistVecJumps), new_level+0.3*histogram_spacer, '$\Delta t$ : {} ms'.format(TimeGap*(i+1)))
@@ -75,7 +75,7 @@ def plot_histogram(HistVecJumps, emp_hist, HistVecJumpsCDF=None, sim_hist=None,
     plt.xlim(0,HistVecJumps.max())
     plt.ylabel('Probability')
     plt.xlabel('jump length ($\mu m$)')
-    if sim_hist != None:
+    if type(sim_hist) != type(None):
         plt.title('{}; Cell number {}; Fit Type = {}; Dfree = {}; Dbound = {}; FracBound = {}, Total trajectories: {}; => Length 3 trajectories: {}, \nLocs = {}, Locs/Frame = {}; jumps: {}'
           .format(
               SampleName, CellNumb, ModelFit,
