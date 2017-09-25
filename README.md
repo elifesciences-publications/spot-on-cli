@@ -1,7 +1,7 @@
 Spot-On (cli)
 -------
 
-This repository collects a series of scripts to analyze data from single particle tracking experiments. The code was initially written by Anders Sejr Hansen and translated to Python by Maxime Woringer. A [Matlab version](https://gitlab.com/anders.sejr.hansen/spot-on-matlab) exists and is maintained by Anders Sejr Hansen.
+This repository collects a series of scripts to analyze data from single particle tracking experiments. The code was initially written by Anders Sejr Hansen and translated to Python by Maxime Woringer. A [Matlab version](https://gitlab.com/tjian-darzacq-lab/spot-on-matlab) exists and is maintained by Anders Sejr Hansen.
 
 This repository only includes the commandline analysis pipeline. A graphical user interface (GUI) is available for a more user-friendly analysis, but is not included in this repository. This repository contains the command-line version, that can be used independently from the GUI.
 
