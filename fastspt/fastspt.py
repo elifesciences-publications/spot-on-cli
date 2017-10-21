@@ -173,7 +173,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                                  LB, UB,
                                  LocError, iterations, dT, dZ, ModelFit, a, b,
                                  fit2states=True, fitSigma=False,
-                                 verbose=True, init=None,
+                                 verbose=True, init=None, useZcorr=True,
                                  solverparams = {'ftol':1e-20,
                                                  'xtol': 1e-20,
                                                  'maxfev': 100000,
@@ -210,7 +210,8 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
               "LB": LB,
               "UB": UB,
               "a": a,
-              "b": b}
+              "b": b,
+              "useZcorr": useZcorr}
 
     ## ==== Get ready for the fitting
     def wrapped_jump_length_2states(x, D_free, D_bound, F_bound, sigma):
@@ -226,7 +227,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], fit2states=True, verbose=False)
+                params['b'], fit2states=True, useZcorr=params['useZcorr'], verbose=False)
         elif params['PDF_or_CDF'] == 2: # CDF fit
             dis = simulate_jump_length_distribution(
                 (D_free, D_bound, F_bound), 
@@ -238,7 +239,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], fit2states=True, verbose=False)
+                params['b'], fit2states=True, useZcorr=params['useZcorr'], verbose=False)
         return dis.flatten()
     
     def wrapped_jump_length_3states(x, D_fast, D_med, D_bound,
@@ -255,7 +256,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], fit2states=False, verbose=False)
+                params['b'], fit2states=False, useZcorr=params['useZcorr'], verbose=False)
         elif params['PDF_or_CDF'] == 2: # CDF fit
             dis = simulate_jump_length_distribution(
                 (D_fast, D_med, D_bound, F_fast, F_bound), 
@@ -267,7 +268,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
                 sigma, #params['LocError'],
                 params['PDF_or_CDF'],
                 params['a'],
-                params['b'], fit2states=False, verbose=False)
+                params['b'], fit2states=False, useZcorr=params['useZcorr'], verbose=False)
         if F_fast+F_bound<1:
             return np.hstack((dis.flatten(), 0))
         else:
@@ -313,6 +314,7 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
         else:
             if (guess.shape[0] != 5 and not fitSigma) or (guess.shape[0] != 6 and fitSigma):
                 print "init value has a wrong number of elements"
+
             pars['D_fast'] .set(min=LB[0], max=UB[0], value=guess[0])
             pars['D_med']  .set(min=LB[1], max=UB[1], value=guess[1])
             pars['D_bound'].set(min=LB[2], max=UB[2], value=guess[2])            
@@ -347,14 +349,17 @@ def fit_jump_length_distribution(JumpProb, JumpProbCDF,
             print('Iteration {} did not yield an improved fit'.format(i+1))
     return out
 
-def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError):
+def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError, useZcorr):
     """Subroutine for simulate_jump_distribution"""
     ## ==== Compute the integral
     HalfDeltaZ_use = DeltaZ_use/2.
     stp = DeltaZ_use/200.
     xint = np.linspace(-HalfDeltaZ_use, HalfDeltaZ_use, 200)
     yint = [C_AbsorBoundAUTO(i, curr_dT, D_FREE, HalfDeltaZ_use)*stp for i in xint]
-    Z_corr = 1/DeltaZ_use * np.array(yint).sum() # see below
+    if useZcorr:
+        Z_corr = 1/DeltaZ_use * np.array(yint).sum() # see below
+    else:
+        Z_corr=1
     
     # update the function output
     y1 = Z_corr * (1-F_BOUND) * (r/(2*(D_FREE*curr_dT+LocError**2)))
@@ -365,18 +370,24 @@ def _compute_2states(D_FREE, D_BOUND, F_BOUND, curr_dT, r, DeltaZ_use, LocError)
     return y1*y2 + y3*y4
     
 def _compute_3states(D_FAST, D_MED, D_BOUND, F_FAST, F_BOUND,
-                     curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError):
+                     curr_dT, r, DeltaZ_useFAST, DeltaZ_useMED, LocError, useZcorr):
     """Subroutine for simulate_jump_distribution"""
     ## ==== Compute the integral
     HalfDeltaZ_useFAST = DeltaZ_useFAST/2.
     xintFAST = np.arange(-HalfDeltaZ_useFAST, HalfDeltaZ_useFAST, 4e-2)
     yintFAST = [C_AbsorBoundAUTO(i, curr_dT, D_FAST, HalfDeltaZ_useFAST)*4e-2 for i in xintFAST]
-    Z_corrFAST = 1/DeltaZ_useFAST * np.array(yintFAST).sum()
+    if useZcorr:
+        Z_corrFAST = 1/DeltaZ_useFAST * np.array(yintFAST).sum()
+    else:
+        Z_corrFAST = 1
 
     HalfDeltaZ_useMED = DeltaZ_useMED/2.
     xintMED = np.arange(-HalfDeltaZ_useMED, HalfDeltaZ_useMED, 4e-2)
     yintMED = [C_AbsorBoundAUTO(i, curr_dT, D_MED, HalfDeltaZ_useMED)*4e-2 for i in xintMED]
-    Z_corrMED = 1/DeltaZ_useMED * np.array(yintMED).sum()
+    if useZcorr:
+        Z_corrMED = 1/DeltaZ_useMED * np.array(yintMED).sum()
+    else:
+        Z_corrMED = 1
     
     # update the function output
     y1 = F_BOUND*(r /(2*(D_BOUND*curr_dT+LocError**2)))
@@ -391,7 +402,7 @@ def _compute_3states(D_FAST, D_MED, D_BOUND, F_FAST, F_BOUND,
 def simulate_jump_length_distribution(parameter_guess, JumpProb,
                                       HistVecJumpsCDF, HistVecJump,
                                       dT, dZ, LocError, PDF_or_CDF, a, b,
-                                      fit2states = True, verbose=True):
+                                      fit2states = True, useZcorr=True, verbose=True):
     """Function 'SS_2State_model_Z_corr_v4' actually returns a distribution
     given the parameter_guess input. This function is to be used inside a
     least square fitting method, such as Matlab's `lsqcurvefit` or 
@@ -439,12 +450,12 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
             print "-- computing dT = {} ({}/{})".format(curr_dT, iterator+1, JumpProb.shape[0])
         if fit2states:
             y[iterator,:] = _compute_2states(D_FREE, D_BOUND, F_BOUND,
-                                             curr_dT, r, DeltaZ_use, LocError)
+                                             curr_dT, r, DeltaZ_use, LocError, useZcorr)
         else:
             y[iterator,:] = _compute_3states(D_FAST, D_MED, D_BOUND,
                                              F_FAST, F_BOUND,
                                              curr_dT, r, DeltaZ_useFAST,
-                                             DeltaZ_useMED, LocError)
+                                             DeltaZ_useMED, LocError, useZcorr)
 
     if PDF_or_CDF == 1:
         # norm_y = np.zeros_like(y)
@@ -484,7 +495,7 @@ def simulate_jump_length_distribution(parameter_guess, JumpProb,
 
 def generate_jump_length_distribution(fitparams, JumpProb, r,
                                       LocError, dT, dZ, a, b, fit2states=True,
-                                      norm=False):
+                                      norm=False, useZcorr=True):
     """
     This function has no docstring. This is bad
     """
@@ -516,12 +527,12 @@ def generate_jump_length_distribution(fitparams, JumpProb, r,
 
         if fit2states:
             y[iterator,:] = _compute_2states(D_free, D_bound, F_bound,
-                                             curr_dT, r, DeltaZ_use, LocError)
+                                             curr_dT, r, DeltaZ_use, LocError, useZcorr)
         else:
             y[iterator,:] = _compute_3states(D_fast, D_med, D_bound,
                                              F_fast, F_bound,
                                              curr_dT, r, DeltaZ_useFAST,
-                                             DeltaZ_useMED, LocError)
+                                             DeltaZ_useMED, LocError, useZcorr)
 
         if norm:
             norm_y = np.zeros_like(y)
