@@ -72,6 +72,7 @@ This program is released under the GNU General Public License version 3 or upper
 
 
 # Authors
+Maxime Woringer, Anders Sejr Hansen
 
 # Bugs/suggestions
 Send to bugtracker or to email.
